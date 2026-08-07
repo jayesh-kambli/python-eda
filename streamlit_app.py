@@ -3,16 +3,27 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import io
+import contextlib
 
+from dotenv import load_dotenv
 import google.generativeai as genai
 
-# GEMINI_API_KEY = ""
+load_dotenv()
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY, transport="rest")
 
 
-model = genai.GenerativeModel("gemini-3.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash")
+
+# Keywords that are not allowed in AI-generated code before we run it.
+# This is a simple safety net, not a real sandbox -- exec() is still exec().
+BLOCKED_KEYWORDS = [
+    "import os", "import sys", "subprocess", "shutil",
+    "open(", "eval(", "exec(", "__import__", "input(",
+]
 
 
 st.set_page_config(page_title="Mini EDA App", layout="wide")
@@ -130,6 +141,9 @@ if uploaded_file:
             placeholder="Example: Show average salary department-wise",
         )
 
+        if "generated_code" not in st.session_state:
+            st.session_state.generated_code = ""
+
         if st.button("Generate Pandas Code"):
 
             if user_query.strip() == "":
@@ -164,18 +178,68 @@ if uploaded_file:
                 Rules:
                 1. Generate ONLY executable pandas code.
                 2. Assume the dataframe name is df.
-                3. Do not explain anything.
-                4. Do not use markdown.
-                5. Return only Python code.
+                3. Store the final answer (a DataFrame, Series, number, or matplotlib plot) in a variable named result.
+                4. Do not explain anything.
+                5. Do not use markdown or code fences.
+                6. Return only Python code.
                 """
 
                 with st.spinner("Generating Code..."):
 
                     response = model.generate_content(prompt)
 
-                st.success("Generated Pandas Code")
+                # Gemini sometimes adds ```python fences even when told not to
+                code = response.text.strip().strip("`")
+                if code.startswith("python"):
+                    code = code[len("python"):].strip()
 
-                st.code(response.text, language="python")
+                st.session_state.generated_code = code
+
+        if st.session_state.generated_code:
+
+            st.write("### Generated Code")
+            edited_code = st.text_area(
+                "You can review or edit the code before running it",
+                value=st.session_state.generated_code,
+                height=200,
+            )
+
+            if st.button("▶ Run Code"):
+
+                if any(word in edited_code for word in BLOCKED_KEYWORDS):
+                    st.error("This code uses operations that aren't allowed to run automatically.")
+
+                else:
+                    local_vars = {"df": df.copy(), "pd": pd, "np": np, "plt": plt}
+                    output_buffer = io.StringIO()
+
+                    try:
+                        with contextlib.redirect_stdout(output_buffer):
+                            exec(edited_code, {}, local_vars)
+
+                        printed_output = output_buffer.getvalue()
+                        if printed_output:
+                            st.text(printed_output)
+
+                        result = local_vars.get("result")
+
+                        if isinstance(result, (pd.DataFrame, pd.Series)):
+                            st.dataframe(result)
+                        elif plt.get_fignums():
+                            st.pyplot(plt.gcf())
+                        elif result is not None:
+                            st.write(result)
+                        elif not printed_output:
+                            st.info(
+                                "Code ran but produced no output. "
+                                "Make sure the answer is stored in a variable named `result`."
+                            )
+
+                    except Exception as e:
+                        st.error(f"Error while running generated code: {e}")
+
+                    finally:
+                        plt.close("all")
 
 
 else:
