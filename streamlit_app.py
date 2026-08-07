@@ -2,12 +2,12 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import os
 
 import google.generativeai as genai
 
-GEMINI_API_KEY = ""
-
+# GEMINI_API_KEY = ""
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
