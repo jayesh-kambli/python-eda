@@ -2,5 +2,5 @@ numpy
 pandas
 matplotlib
 streamlit
-google.generativeai
+google-genai
 python-dotenv

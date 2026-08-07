@@ -7,16 +7,15 @@ import io
 import contextlib
 
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY, transport="rest")
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+MODEL_NAME = "gemini-3.6-flash"
 
 # Keywords that are not allowed in AI-generated code before we run it.
 # This is a simple safety net, not a real sandbox -- exec() is still exec().
@@ -186,7 +185,10 @@ if uploaded_file:
 
                 with st.spinner("Generating Code..."):
 
-                    response = model.generate_content(prompt)
+                    response = client.models.generate_content(
+                        model=MODEL_NAME,
+                        contents=prompt,
+                    )
 
                 # Gemini sometimes adds ```python fences even when told not to
                 code = response.text.strip().strip("`")
