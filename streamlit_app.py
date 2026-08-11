@@ -46,7 +46,7 @@ st.set_page_config(page_title="Dataset Explorer", page_icon="▦", layout="wide"
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 2.3rem; max-width: 1180px; }
+    .block-container { padding-top: 4rem; max-width: 1180px; }
 
     .eyebrow {
         text-transform: uppercase;
