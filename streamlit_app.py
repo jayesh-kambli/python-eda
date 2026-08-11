@@ -385,6 +385,17 @@ else:
             "pandas code against `df`; review it, then run it."
         )
 
+        with st.container(border=True):
+            st.markdown(
+                '<div class="eyebrow" style="color:#C17A2E;">Before you run this</div>'
+                "Generated code runs with Python's <code>exec()</code>. A keyword filter "
+                "blocks obvious escapes (<code>import os</code>, <code>subprocess</code>, "
+                "<code>open(</code>, <code>eval(</code>...), but this is not a sandbox — "
+                "read the code before running it, especially on data you didn't create "
+                "yourself.",
+                unsafe_allow_html=True,
+            )
+
         user_query = st.text_input(
             "Analysis request",
             placeholder="e.g. Show average revenue by region, sorted descending",
