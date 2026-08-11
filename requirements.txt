@@ -1,6 +1,7 @@
 numpy
 pandas
 matplotlib
+plotly
 streamlit
 google-genai
 python-dotenv
