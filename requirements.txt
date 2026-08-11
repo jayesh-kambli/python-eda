@@ -2,6 +2,7 @@ numpy
 pandas
 matplotlib
 plotly
+seaborn
 streamlit
 google-genai
 python-dotenv
