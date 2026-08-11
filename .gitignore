@@ -2,3 +2,5 @@ myenv
 .env
 .gitignore
 .claude
+__pycache__/
+*.pyc

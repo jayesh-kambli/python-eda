@@ -16,6 +16,10 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 MODEL_NAME = "gemini-3.6-flash"
 
+# If set, the AI Assistant is gated behind this access code so a public
+# deployment can't have its API credits drained by anonymous visitors.
+ASSISTANT_ACCESS_CODE = os.getenv("ASSISTANT_ACCESS_CODE")
+
 # Keywords that are not allowed in AI-generated code before we run it.
 # This is a simple safety net, not a real sandbox -- exec() is still exec().
 BLOCKED_KEYWORDS = [
@@ -396,20 +400,44 @@ else:
                 unsafe_allow_html=True,
             )
 
-        user_query = st.text_input(
-            "Analysis request",
-            placeholder="e.g. Show average revenue by region, sorted descending",
-            label_visibility="collapsed",
-        )
+        unlocked = True
+        if ASSISTANT_ACCESS_CODE:
+            if "assistant_unlocked" not in st.session_state:
+                st.session_state.assistant_unlocked = False
+            unlocked = st.session_state.assistant_unlocked
 
-        if "generated_code" not in st.session_state:
-            st.session_state.generated_code = ""
+            if not unlocked:
+                with st.form("assistant_unlock"):
+                    st.write(
+                        "This feature calls a paid API on every request. "
+                        "Enter the access code to use it."
+                    )
+                    code_input = st.text_input(
+                        "Access code", type="password",
+                        label_visibility="collapsed", placeholder="Access code",
+                    )
+                    if st.form_submit_button("Unlock"):
+                        if code_input == ASSISTANT_ACCESS_CODE:
+                            st.session_state.assistant_unlocked = True
+                            st.rerun()
+                        else:
+                            st.error("Incorrect access code.")
 
-        if st.button("Generate code"):
-            if user_query.strip() == "":
-                st.warning("Enter a request first.")
-            else:
-                prompt = f"""You are an expert Python data analyst.
+        if unlocked:
+            user_query = st.text_input(
+                "Analysis request",
+                placeholder="e.g. Show average revenue by region, sorted descending",
+                label_visibility="collapsed",
+            )
+
+            if "generated_code" not in st.session_state:
+                st.session_state.generated_code = ""
+
+            if st.button("Generate code"):
+                if user_query.strip() == "":
+                    st.warning("Enter a request first.")
+                else:
+                    prompt = f"""You are an expert Python data analyst.
 
 Dataset columns:
 {list(df.columns)}
@@ -428,66 +456,66 @@ Rules:
 5. Do not use markdown or code fences.
 6. Return only Python code."""
 
-                with st.spinner("Generating code..."):
-                    response = client.models.generate_content(
-                        model=MODEL_NAME,
-                        contents=prompt,
-                    )
+                    with st.spinner("Generating code..."):
+                        response = client.models.generate_content(
+                            model=MODEL_NAME,
+                            contents=prompt,
+                        )
 
-                # The model sometimes adds ```python fences even when told not to.
-                code = response.text.strip().strip("`")
-                if code.startswith("python"):
-                    code = code[len("python"):].strip()
+                    # The model sometimes adds ```python fences even when told not to.
+                    code = response.text.strip().strip("`")
+                    if code.startswith("python"):
+                        code = code[len("python"):].strip()
 
-                st.session_state.generated_code = code
+                    st.session_state.generated_code = code
 
-        if st.session_state.generated_code:
-            st.write("")
-            st.markdown('<div class="eyebrow">Generated code</div>', unsafe_allow_html=True)
-            edited_code = st.text_area(
-                "Generated code",
-                value=st.session_state.generated_code,
-                height=200,
-                label_visibility="collapsed",
-            )
+            if st.session_state.generated_code:
+                st.write("")
+                st.markdown('<div class="eyebrow">Generated code</div>', unsafe_allow_html=True)
+                edited_code = st.text_area(
+                    "Generated code",
+                    value=st.session_state.generated_code,
+                    height=200,
+                    label_visibility="collapsed",
+                )
 
-            if st.button("Run code"):
-                if any(word in edited_code for word in BLOCKED_KEYWORDS):
-                    st.error("This code uses operations that aren't allowed to run automatically.")
-                else:
-                    local_vars = {"df": df.copy(), "pd": pd, "np": np}
-                    import matplotlib.pyplot as plt
-                    local_vars["plt"] = plt
-                    output_buffer = io.StringIO()
+                if st.button("Run code"):
+                    if any(word in edited_code for word in BLOCKED_KEYWORDS):
+                        st.error("This code uses operations that aren't allowed to run automatically.")
+                    else:
+                        local_vars = {"df": df.copy(), "pd": pd, "np": np}
+                        import matplotlib.pyplot as plt
+                        local_vars["plt"] = plt
+                        output_buffer = io.StringIO()
 
-                    st.markdown('<div class="eyebrow">Result</div>', unsafe_allow_html=True)
-                    try:
-                        with contextlib.redirect_stdout(output_buffer):
-                            exec(edited_code, {}, local_vars)
+                        st.markdown('<div class="eyebrow">Result</div>', unsafe_allow_html=True)
+                        try:
+                            with contextlib.redirect_stdout(output_buffer):
+                                exec(edited_code, {}, local_vars)
 
-                        printed_output = output_buffer.getvalue()
-                        if printed_output:
-                            st.text(printed_output)
+                            printed_output = output_buffer.getvalue()
+                            if printed_output:
+                                st.text(printed_output)
 
-                        result = local_vars.get("result")
+                            result = local_vars.get("result")
 
-                        if isinstance(result, (pd.DataFrame, pd.Series)):
-                            st.dataframe(result, width="stretch")
-                        elif plt.get_fignums():
-                            st.pyplot(plt.gcf())
-                        elif result is not None:
-                            st.write(result)
-                        elif not printed_output:
-                            st.info(
-                                "Code ran but produced no output. Make sure the "
-                                "answer is stored in a variable named `result`."
-                            )
+                            if isinstance(result, (pd.DataFrame, pd.Series)):
+                                st.dataframe(result, width="stretch")
+                            elif plt.get_fignums():
+                                st.pyplot(plt.gcf())
+                            elif result is not None:
+                                st.write(result)
+                            elif not printed_output:
+                                st.info(
+                                    "Code ran but produced no output. Make sure the "
+                                    "answer is stored in a variable named `result`."
+                                )
 
-                    except Exception as e:
-                        st.error(f"Error while running generated code: {e}")
+                        except Exception as e:
+                            st.error(f"Error while running generated code: {e}")
 
-                    finally:
-                        plt.close("all")
+                        finally:
+                            plt.close("all")
 
     st.markdown(
         '<div class="footer-note">Dataset Explorer &middot; local session, '
