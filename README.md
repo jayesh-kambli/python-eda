@@ -28,11 +28,11 @@ myenv/Scripts/activate   # On macOS/Linux: source myenv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the project root with a Gemini API key (required
+Create a `.env` file in the project root with an OpenAI API key (required
 only for the AI Assistant tab):
 
 ```
-GEMINI_API_KEY=your_key_here
+OPEN_AI_API_KEY=your_key_here
 ```
 
 If you're deploying this somewhere public, also set an access code so

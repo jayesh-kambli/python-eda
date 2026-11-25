@@ -7,14 +7,14 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=GEMINI_API_KEY)
+OPEN_AI_API_KEY = os.getenv("OPEN_AI_API_KEY")
+client = OpenAI(api_key=OPEN_AI_API_KEY) if OPEN_AI_API_KEY else None
 
-MODEL_NAME = "gemini-3.6-flash"
+MODEL_NAME = os.getenv("OPENAI_MODEL", "gpt-6-luna")
 
 # If set, the AI Assistant is gated behind this access code so a public
 # deployment can't have its API credits drained by anonymous visitors.
@@ -436,6 +436,8 @@ else:
             if st.button("Generate code"):
                 if user_query.strip() == "":
                     st.warning("Enter a request first.")
+                elif client is None:
+                    st.error("The AI Assistant isn't configured: OPEN_AI_API_KEY is missing.")
                 else:
                     prompt = f"""You are an expert Python data analyst.
 
@@ -457,13 +459,13 @@ Rules:
 6. Return only Python code."""
 
                     with st.spinner("Generating code..."):
-                        response = client.models.generate_content(
+                        response = client.responses.create(
                             model=MODEL_NAME,
-                            contents=prompt,
+                            input=prompt,
                         )
 
                     # The model sometimes adds ```python fences even when told not to.
-                    code = response.text.strip().strip("`")
+                    code = response.output_text.strip().strip("`")
                     if code.startswith("python"):
                         code = code[len("python"):].strip()
 

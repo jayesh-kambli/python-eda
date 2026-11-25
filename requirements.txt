@@ -4,5 +4,5 @@ matplotlib
 plotly
 seaborn
 streamlit
-google-genai
+openai
 python-dotenv
